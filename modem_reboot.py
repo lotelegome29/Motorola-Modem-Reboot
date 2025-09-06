@@ -14,8 +14,8 @@ class SurfboardHNAP:
         self.host = None
 
     def generate_keys(self, challenge, pubkey, password):
-        privatekey = hmac.new(pubkey+password, challenge).hexdigest().upper()
-        passkey = hmac.new(privatekey.encode(), challenge).hexdigest().upper()
+        privatekey = hmac.new(pubkey+password, challenge, 'MD5').hexdigest().upper()
+        passkey = hmac.new(privatekey.encode(), challenge, 'MD5').hexdigest().upper()
         self.privatekey = privatekey
         return (privatekey, passkey)
 
@@ -24,11 +24,11 @@ class SurfboardHNAP:
         curtime = str(int(time.time() * 1000))
         auth_key = curtime + '"http://purenetworks.com/HNAP1/{}"'.format(operation)
         privkey = privkey.encode()
-        auth = hmac.new(privkey, auth_key.encode())
+        auth = hmac.new(privkey, auth_key.encode(), 'MD5')
         return auth.hexdigest().upper() + ' ' + curtime
 
     def _login_request(self, host):
-        url = 'http://{}/HNAP1/'.format(host)
+        url = 'https://{}/HNAP1/'.format(host)
         headers = {#'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.34 Safari/537.36',
                 #'Content-Type' : 'application/json; charset=UTF-8',
                 #'Accept' : 'application/json, text/javascript, */*; q=0.01',
@@ -36,11 +36,11 @@ class SurfboardHNAP:
                 'SOAPAction' : '"http://purenetworks.com/HNAP1/Login"'}
         payload = '{"Login":{"Action":"request","Username":"admin","LoginPassword":"","Captcha":"","PrivateLogin":"LoginPassword"}}'
 
-        r = self.s.post(url, headers=headers, data=payload, stream=True)
+        r = self.s.post(url, headers=headers, data=payload, stream=True, verify=certificate)
         return r
 
     def _login_real(self, host, cookie_id, privatekey, passkey):
-        url = 'http://{}/HNAP1/'.format(host)
+        url = 'https://{}/HNAP1/'.format(host)
         auth = self.generate_hnap_auth('Login')
         headers = {'HNAP_AUTH' : auth,
                 #'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.34 Safari/537.36',
@@ -54,9 +54,9 @@ class SurfboardHNAP:
                 'Captcha': '',
                 'LoginPassword': '{}'.format(passkey),
                 'PrivateLogin': 'LoginPassword',
-                'Username': 'admin'}}
+                'Username': user}}
 
-        r = self.s.post(url, headers=headers, cookies=cookies, json=payload)
+        r = self.s.post(url, headers=headers, cookies=cookies, json=payload, verify=certificate)
         return r
 
     def login(self, host, password, noverify):
@@ -81,7 +81,7 @@ class SurfboardHNAP:
         cookie_id = self.cookie_id 
         privatekey = self.privatekey
 
-        url = 'http://{}/HNAP1/'.format(host)
+        url = 'https://{}/HNAP1/'.format(host)
         auth = self.generate_hnap_auth('GetMultipleHNAPs')
         headers = {'HNAP_AUTH' : auth,
                 #'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.34 Safari/537.36',
@@ -102,7 +102,7 @@ class SurfboardHNAP:
         payload = {'GetMultipleHNAPs': {'GetMotoStatusSoftware': '',
                 'GetMotoStatusXXX': ''}}
 
-        r = self.s.post(url, headers=headers, cookies=cookies, json=payload)
+        r = self.s.post(url, headers=headers, cookies=cookies, json=payload, verify=certificate)
         return r
 
     def get_security(self):
@@ -110,7 +110,7 @@ class SurfboardHNAP:
         cookie_id = self.cookie_id
         privatekey = self.privatekey
 
-        url = 'http://{}/HNAP1/'.format(host)
+        url = 'https://{}/HNAP1/'.format(host)
         auth = self.generate_hnap_auth('GetMultipleHNAPs')
         headers = {'HNAP_AUTH' : auth,
                 #'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.34 Safari/537.36',
@@ -129,7 +129,7 @@ class SurfboardHNAP:
         payload = {'GetMultipleHNAPs': {'GetMotoStatusSecAccount': '',
                 'GetMotoStatusSecXXX': ''}}
 
-        r = self.s.post(url, headers=headers, cookies=cookies, json=payload)
+        r = self.s.post(url, headers=headers, cookies=cookies, json=payload, verify=certificate)
         return r
 
     def reboot(self):
@@ -137,7 +137,7 @@ class SurfboardHNAP:
         cookie_id = self.cookie_id
         privatekey = self.privatekey
 
-        url = 'http://{}/HNAP1/'.format(host)
+        url = 'https://{}/HNAP1/'.format(host)
         auth = self.generate_hnap_auth('SetStatusSecuritySettings')
         headers = {'HNAP_AUTH' : auth,
                 #'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.34 Safari/537.36',
@@ -150,7 +150,7 @@ class SurfboardHNAP:
                 'PrivateKey' : '{}'.format(privatekey)}
         payload = {'SetStatusSecuritySettings': {'MotoStatusSecurityAction': '1',
                 'MotoStatusSecXXX': 'XXX'}}
-        r = self.s.post(url, headers=headers, cookies=cookies, json=payload)
+        r = self.s.post(url, headers=headers, cookies=cookies, json=payload, verify=certificate)
         return r
 
 
@@ -158,22 +158,29 @@ def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', default='192.168.100.1', 
             help='Hostname or IP of your modem (Default: 192.168.100.1)')
+    parser.add_argument('--user', default='admin', 
+            help='Admin username (Default: admin)')            
     parser.add_argument('--password', default='motorola', 
             help='Admin password (Default: motorola)')
     parser.add_argument('--dryrun', '-d', action='store_true', 
                         help="Logs in but doesn't reboot")
     parser.add_argument('--noverify', '-n', action='store_true', 
                         help="Disable certificate verification")
+    parser.add_argument('--cert', '-c', default='',
+                        help="Specify a certificate")  						
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = get_arguments()
     host = args.host
+    user = args.user
     password = args.password
+    certificate = args.cert	
 
     h = SurfboardHNAP()
     r = h.login(host, password, args.noverify)
     print('login: {}'.format(r))
+    print(r.text)
     r = h.get_status()
     print('status: {}'.format(r))
     if not args.dryrun:
